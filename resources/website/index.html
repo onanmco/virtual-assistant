@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virtual Assistant</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    #microphone {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: #3498db;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    #microphone-icon {
+      font-size: 60px;
+      color: #fff;
+      transition: transform 0.5s ease-in-out;
+    }
+
+    #waves {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: inherit;
+      box-shadow: 0 0 10px rgba(52, 152, 219, 0.7);
+    }
+
+    #text {
+      margin-top: 50px;
+      font-size: 18px;
+      color: #333;
+      text-align: center;
+      transition: opacity 0.7s ease-in-out;
+    }
+
+    .pulsing {
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 10px rgba(52, 152, 219, 0.7), 0 0 60px rgba(52, 152, 219, 0.5);
+      }
+
+      50% {
+        box-shadow: 0 0 90px rgba(52, 152, 219, 0.9), 0 0 60px rgba(52, 152, 219, 0.7);
+      }
+
+      100% {
+        box-shadow: 0 0 10px rgba(52, 152, 219, 0.7), 0 0 60px rgba(52, 152, 219, 0.5);
+      }
+    }
+
+    #audioPlayer {
+      width: 80%;
+      max-width: 600px;
+    }
+
+    #overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .modal {
+      width: 80%;
+      max-width: 600px;
+      background-color: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      height: 60vh;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+
+<body>
+<div id="microphone" onclick="toggleRecording()">
+  <div id="waves"></div>
+  <i id="microphone-icon" class="material-icons">mic</i>
+</div>
+<div id="text">Ask me something</div>
+
+<div id="overlay"></div>
+
+<script>
+  let recording = false;
+  const microphoneIcon = document.getElementById('microphone-icon');
+  const textElement = document.getElementById('text');
+  const waves = document.getElementById('waves');
+  const overlay = document.getElementById('overlay');
+  let mediaRecorder;
+  let chunks = [];
+  let interval;
+
+  function animateProcessing() {
+    interval = setInterval(() => {
+      const dots = '...';
+      if (textElement.innerHTML.endsWith(dots)) {
+        textElement.innerHTML = textElement.innerHTML.replace(dots, '');
+      } else {
+        textElement.innerHTML += '.';
+      }
+    }, 500);
+  }
+
+  function stopAnimateProcessing() {
+    clearInterval(interval);
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      setupMediaRecorder();
+    } catch (error) {
+      handleRecordingError(error);
+    }
+  }
+
+  function setupMediaRecorder() {
+    mediaRecorder.ondataavailable = handleDataAvailable;
+    mediaRecorder.onstop = handleRecordingStop;
+    chunks = [];
+    mediaRecorder.start();
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    }
+  }
+
+  function handleDataAvailable(e) {
+    if (e.data.size > 0) {
+      chunks.push(e.data);
+    }
+  }
+
+  function handleRecordingStop() {
+    const blob = new Blob(chunks, { type: 'audio/wav' });
+    const reader = new FileReader();
+
+    reader.onloadend = function () {
+      ask(blob);
+    };
+
+    reader.readAsDataURL(blob);
+  }
+
+  function handleRecordingError(error) {
+    console.error('Error accessing microphone:', error);
+  }
+
+  async function uploadAudio(signedUrl, binaryData, socket) {
+    try {
+      const response = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'audio/wave',
+        },
+        body: binaryData,
+      });
+
+      console.log('Upload Audio Response:', response);
+
+      if (!response.ok) {
+        throw new Error('Error uploading audio data');
+      }
+    } catch (error) {
+      handleUploadError(error);
+      socket.close();
+    }
+  }
+
+  // TODO update the URL with your WebSocket URL
+  function ask(binaryData) {
+    const socket = new WebSocket('{YOUR_WEBSOCKET_URL}}');
+    socket.addEventListener('open', () => {
+      console.log('WebSocket connection opened');
+      socket.send("");
+    });
+
+    socket.addEventListener('message', (event) => {
+      try {
+        const response = JSON.parse(event.data);
+        console.log('WebSocket message received:', response);
+
+        handleSocketMessage(response, binaryData, socket);
+      } catch (parseError) {
+        console.error('Error parsing WebSocket message:', parseError);
+      }
+    });
+
+    socket.addEventListener('close', () => {
+      console.log('WebSocket connection closed');
+    });
+
+    socket.addEventListener('error', (event) => {
+      console.error('WebSocket error:', event);
+    });
+  }
+
+  function handleSocketMessage(response, binaryData, socket) {
+    if (!response.statusCode || response.statusCode >= 400) {
+      const errorMessage = response.message ?? "Something went wrong";
+      stopAnimateProcessing();
+      showOverlay(errorMessage);
+      socket.close();
+    }
+
+    if (response.statusCode < 200) {
+      return;
+    }
+
+    if (response.signedUrl) {
+      uploadAudio(response.signedUrl, binaryData, socket);
+    }
+
+    if (response.textAnswer && response.audioAnswer) {
+      stopAnimateProcessing();
+      showOverlay(response.textAnswer, response.audioAnswer);
+      socket.close();
+    }
+  }
+
+  function handleUploadError(error) {
+    console.error('Error sending audio data:', error);
+    stopAnimateProcessing();
+    showOverlay("Something went wrong");
+  }
+
+  function showOverlay(textMessage, audioAnswer) {
+    removeExistingModals();
+
+    const modal = createModal();
+    const popup = createPopup(textMessage);
+    const audioElement = createAudioElement(audioAnswer);
+
+    appendElements(modal, popup, audioElement);
+    appendToOverlay(modal);
+
+    overlay.style.display = 'flex';
+    overlay.addEventListener('click', closeOverlay);
+  }
+
+  function removeExistingModals() {
+    const existingModals = document.querySelectorAll('.modal');
+    existingModals.forEach(modal => modal.remove());
+  }
+
+  function createModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    return modal;
+  }
+
+  function createPopup(textMessage) {
+    const popup = document.createElement('div');
+    popup.id = 'audioPopup';
+    popup.innerHTML = `<p>${textMessage}</p>`;
+    return popup;
+  }
+
+  function createAudioElement(audioAnswer) {
+    const audioElement = document.createElement('audio');
+    audioElement.src = audioAnswer;
+    audioElement.autoplay = true;
+    return audioElement;
+  }
+
+  function appendElements(modal, ...elements) {
+    elements.forEach(element => modal.appendChild(element));
+  }
+
+  function appendToOverlay(modal) {
+    overlay.appendChild(modal);
+  }
+
+  function closeOverlay(event) {
+    const modal = document.querySelector('.modal');
+    if (event.target === overlay) {
+      modal.remove();
+      overlay.style.display = 'none';
+      textElement.innerHTML = "Ask me something";
+    }
+  }
+
+  function toggleRecording() {
+    recording = !recording;
+
+    if (recording) {
+      startRecording();
+      textElement.innerText = "I am listening to";
+      waves.classList.add('pulsing');
+    } else {
+      stopRecording();
+      textElement.innerText = "Processing";
+      animateProcessing();
+      waves.classList.remove('pulsing');
+    }
+  }
+</script>
+</body>
+
+</html>
+
+</html>
