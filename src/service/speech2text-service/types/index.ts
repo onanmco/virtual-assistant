@@ -10,7 +10,7 @@ export interface StartTranscribeJob {
     bucket: string;
     key: string;
   },
-  languageCodes: LanguageCode[];
+  languageCode: LanguageCode;
 }
 
 export interface GetTranscriptionInput {

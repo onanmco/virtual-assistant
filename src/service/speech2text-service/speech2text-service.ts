@@ -22,8 +22,7 @@ export class Speech2TextService implements ISpeech2TextService {
       new StartTranscriptionJobCommand(
         {
           TranscriptionJobName: input.jobName,
-          IdentifyLanguage: true,
-          LanguageOptions: input.languageCodes,
+          LanguageCode: input.languageCode,
           Media: {
             MediaFileUri: `s3://${input.input.bucket}/${input.input.key}`
           },

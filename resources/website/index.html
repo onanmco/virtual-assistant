@@ -91,6 +91,13 @@
     }
 
     .modal {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #audioPopup {
       width: 80%;
       max-width: 600px;
       background-color: #fff;
@@ -99,6 +106,36 @@
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
       height: 60vh;
       overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+
+    .question {
+      justify-content: flex-end;
+      padding-right: 10px;
+      width: 50%;
+      background-color: lightgray;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding-top: 10px;
+      padding-bottom: 10px;
+      align-self: flex-end;
+      margin-bottom: 20px;
+      text-align: right;
+    }
+
+    .answer {
+      justify-content: flex-end;
+      padding-left: 10px;
+      width: 50%;
+      background-color: lightskyblue;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding-top: 10px;
+      padding-bottom: 10px;
+      align-self: flex-start;
+      text-align: left;
     }
   </style>
 </head>
@@ -203,9 +240,9 @@
     }
   }
 
-  // TODO update the URL with your WebSocket URL
+  // TODO update the WebSocket URL with yours
   function ask(binaryData) {
-    const socket = new WebSocket('{YOUR_WEBSOCKET_URL}}');
+    const socket = new WebSocket('{YOUR_WEBSOCKET_URL}');
     socket.addEventListener('open', () => {
       console.log('WebSocket connection opened');
       socket.send("");
@@ -247,9 +284,13 @@
       uploadAudio(response.signedUrl, binaryData, socket);
     }
 
-    if (response.textAnswer && response.audioAnswer) {
+    if (response.textAnswer && response.audioAnswer && response.question) {
       stopAnimateProcessing();
-      showOverlay(response.textAnswer, response.audioAnswer);
+      const html = `
+      <div class="question">${response.question}</div>
+      <div class="answer">${response.textAnswer}</div>
+      `;
+      showOverlay(html, response.audioAnswer);
       socket.close();
     }
   }
@@ -288,7 +329,7 @@
   function createPopup(textMessage) {
     const popup = document.createElement('div');
     popup.id = 'audioPopup';
-    popup.innerHTML = `<p>${textMessage}</p>`;
+    popup.innerHTML = textMessage;
     return popup;
   }
 
@@ -309,11 +350,9 @@
 
   function closeOverlay(event) {
     const modal = document.querySelector('.modal');
-    if (event.target === overlay) {
-      modal.remove();
-      overlay.style.display = 'none';
-      textElement.innerHTML = "Ask me something";
-    }
+    modal.remove();
+    overlay.style.display = 'none';
+    textElement.innerHTML = "Ask me something";
   }
 
   function toggleRecording() {

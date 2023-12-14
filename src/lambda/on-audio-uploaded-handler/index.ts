@@ -40,10 +40,7 @@ const _handler: Handler = async (event) => {
         bucket: request.transcribeOutputBucket,
         key: request.transcribeOutputKey
       },
-      languageCodes: [
-        "en-US",
-        "en-GB"
-      ]
+      languageCode: "en-US",
     });
   }
 
